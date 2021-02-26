@@ -318,11 +318,11 @@ function buildRefModel (document, options, metadata) {
     // Iterate over the references and process
     _.forOwn(refs, function (refDetails, refPtr) {
       var refKey = makeAbsolute(options.location) + refPtr;
-      var refdKey = refDetails.refdId = decodeURI(makeAbsolute(isRemote(refDetails) ?
+      var refdKey = refDetails.refdId = decodeURIComponent(makeAbsolute(isRemote(refDetails) ?
                                                        combineURIs(relativeBase, refDetails.uri) :
                                                        options.location) + '#' +
                                           (refDetails.uri.indexOf('#') > -1 ?
-                                             refDetails.uri.split('#')[1] :
+                                             splitFragment(refDetails.uri)[1] :
                                              ''));
 
       // Record reference metadata
@@ -351,14 +351,14 @@ function buildRefModel (document, options, metadata) {
 
       rOptions.subDocPath = _.isUndefined(refDetails.uriDetails.fragment) ?
                                      [] :
-                                     pathFromPtr(decodeURI(refDetails.uriDetails.fragment));
+                                     pathFromPtr(decodeURIComponent(refDetails.uriDetails.fragment));
 
       // Resolve the reference
       if (isRemote(refDetails)) {
         // Delete filter.options because all remote references should be fully resolved
         delete rOptions.filter;
         // The new location being referenced
-        rOptions.location = refdKey.split('#')[0];
+        rOptions.location = splitFragment(refdKey)[0];
 
         allTasks = allTasks
           .then(function (nMetadata, nOptions) {
@@ -509,7 +509,7 @@ function validateOptions (options, obj) {
     options.location = makeAbsolute('./root.json');
   }
 
-  locationParts = options.location.split('#');
+  locationParts = splitFragment(options.location);
 
   // If options.location contains a fragment, turn it into an options.subDocPath
   if (locationParts.length > 1) {
@@ -900,12 +900,12 @@ function resolveRefs (obj, options) {
       // Resolve the references in reverse order since the current order is top-down
       _.forOwn(Object.keys(results.deps).reverse(), function (parentPtr) {
         var deps = results.deps[parentPtr];
-        var pPtrParts = parentPtr.split('#');
+        var pPtrParts = splitFragment(parentPtr);
         var pDocument = results.docs[pPtrParts[0]];
         var pPtrPath = pathFromPtr(pPtrParts[1]);
 
         _.forOwn(deps, function (dep, prop) {
-          var depParts = dep.split('#');
+          var depParts = splitFragment(dep);
           var dDocument = results.docs[depParts[0]];
           var dPtrPath = pPtrPath.concat(pathFromPtr(prop));
           var refDetails = results.refs[pPtrParts[0] + pathToPtr(dPtrPath)];
@@ -936,7 +936,7 @@ function resolveRefs (obj, options) {
       });
 
       function walkRefs (root, refPtr, refPath) {
-        var refPtrParts = refPtr.split('#');
+        var refPtrParts = splitFragment(refPtr);
         var refDetails = results.refs[refPtr];
         var refDeps;
 
@@ -1097,6 +1097,18 @@ function resolveRefsAt (location, options) {
     });
 
   return allTasks;
+}
+
+// splits a fragment from a URI using the first hash found
+function splitFragment(uri) {
+  var hash = uri.indexOf('#');
+  if (hash < 0) {
+    return [uri];
+  }
+  return [
+    uri.substring(0, hash),
+    uri.substring(hash + 1)
+  ];
 }
 
 /**
